@@ -1,0 +1,60 @@
+#include <WiFi.h>
+#include "DHTesp.h"
+#include "ThingSpeak.h"
+#include <random>
+
+const int DHT_PIN = 15; // DHT22 sensor GPIO Pin
+const char* WIFI_NAME = "Wokwi-GUEST"; // WiFi SSID
+const char* WIFI_PASSWORD = ""; // WiFI Password
+const int myChannelNumber = 2485437; // ThingSpeak channel number
+const char* myApiKey = "8ZDNURZD3Q6PE5EU"; // ThingSpeak API key
+const char* server = "api.thingspeak.com"; // ThingSpeak server address
+
+DHTesp dhtSensor;
+WiFiClient client;
+
+// Function to generate simulated CO2 values within the specified range
+int generateCO2Value() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dis(300, 2000);
+    return dis(gen);
+}
+
+void setup() {
+    Serial.begin(115200);
+    dhtSensor.setup(DHT_PIN, DHTesp::DHT22);
+    WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
+    while (WiFi.status() != WL_CONNECTED){
+        delay(1000);
+        Serial.println("Wifi not connected");
+    }
+    Serial.println("Wifi connected !");
+    Serial.println("Local IP: " + String(WiFi.localIP()));
+    WiFi.mode(WIFI_STA);
+    ThingSpeak.begin(client);
+}
+
+void loop() {
+    TempAndHumidity data = dhtSensor.getTempAndHumidity();
+    int co2Value = generateCO2Value(); // Generate CO2 value
+
+    ThingSpeak.setField(1, data.temperature);
+    ThingSpeak.setField(2, data.humidity);
+    ThingSpeak.setField(3, co2Value); // Set CO2 value in field 3
+
+    int status = ThingSpeak.writeFields(myChannelNumber, myApiKey);
+  
+    Serial.println("Temp: " + String(data.temperature, 2) + "°C");
+    Serial.println("Humidity: " + String(data.humidity, 1) + "%");
+    Serial.println("CO2: " + String(co2Value) + " ppm");
+  
+    if(status == 200){
+        Serial.println("Data pushed successfully");
+    } else {
+        Serial.println("Push error" + String(status));
+    }
+    Serial.println("---");
+
+    delay(1000);
+}
